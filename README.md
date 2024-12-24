@@ -12,6 +12,21 @@ spec, you might be looking for [yaegi][yaegi].
 
 For best results, use with [rlwrap][rlwrap].
 
+## Install
+
+### curl
+
+```sh
+curl lesiw.io/gofi | sh
+```
+
+### go install
+
+```sh
+go install lesiw.io/gofi@latest
+```
+
+
 ## Usage
 
 ```text
