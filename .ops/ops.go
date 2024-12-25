@@ -10,7 +10,7 @@ import (
 type Ops struct{ goapp.Ops }
 
 func main() {
-	goapp.Name = "gofi"
+	goapp.Name = "igo"
 	if len(os.Args) < 2 {
 		os.Args = append(os.Args, "build")
 	}

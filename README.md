@@ -1,6 +1,6 @@
-# gofi: A Fake Interpreter for Go
+# igo: A Fake Go Interpreter
 
-![gofi demo](/../images/demo.gif)
+![igo demo](/../images/demo.gif)
 
 This is a hack. It works by appending each line you type to a Go program and
 rerunning it, then hiding the repeated output.
@@ -17,23 +17,23 @@ For best results, use with [rlwrap][rlwrap].
 ### curl
 
 ```sh
-curl lesiw.io/gofi | sh
+curl lesiw.io/igo | sh
 ```
 
 ### go install
 
 ```sh
-go install lesiw.io/gofi@latest
+go install lesiw.io/igo@latest
 ```
 
 
 ## Usage
 
 ```text
-usage: gofi [FILE]
+usage: igo [FILE]
 ```
 
-Append to an existing Go file by passing it in as an argument, e.g. `gofi
+Append to an existing Go file by passing it in as an argument, e.g. `igo
 main.go`.
 
 Run it without any arguments to start from an empty `package main`.

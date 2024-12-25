@@ -1,4 +1,4 @@
-module lesiw.io/gofi
+module lesiw.io/igo
 
 go 1.23.4
 

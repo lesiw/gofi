@@ -42,12 +42,12 @@ func run() error {
 	var s session
 	var err error
 	if len(os.Args) < 2 {
-		dir, err := os.MkdirTemp("", "gofi")
+		dir, err := os.MkdirTemp("", "igo")
 		if err != nil {
 			return fmt.Errorf("failed to create temporary directory: %w", err)
 		}
 		defers.Add(func() { _ = os.RemoveAll(dir) })
-		cmd := exec.Command("go", "mod", "init", "gofi.localhost")
+		cmd := exec.Command("go", "mod", "init", "igo.localhost")
 		cmd.Dir = dir
 		if out, err := cmd.CombinedOutput(); err != nil {
 			return fmt.Errorf(`failed to run "go mod init": %s`,
