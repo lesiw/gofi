@@ -5,6 +5,9 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -23,11 +26,13 @@ const unused = "declared and not used: "
 const foundEOF = "found 'EOF'"
 
 type session struct {
-	dir string
-	pth string
-	src []byte
-	off int
-	usr strings.Builder
+	dir string       // Working directory.
+	pth string       // Path to source file.
+	src []byte       // Source code.
+	off int          // Offset to the last bracket of main().
+	frm int          // Last printed line.
+	usr bytes.Buffer // User code.
+	rem string       // Remaining output after EOF.
 }
 
 func main() {
@@ -54,7 +59,8 @@ func run() error {
 				bytes.TrimSpace(out))
 		}
 		s.pth = filepath.Join(dir, "main.go")
-		s.src = []byte("package main")
+		s.src = []byte("package main\n\nfunc main() {}\n")
+		s.off = len(s.src) - 2
 		s.dir = dir
 	} else {
 		s.pth = os.Args[1]
@@ -62,9 +68,37 @@ func run() error {
 		if err != nil {
 			return fmt.Errorf("bad file %q: %w", s.pth, err)
 		}
-		defers.Add(func() { _ = os.WriteFile(s.pth, s.src, 0644) })
+		src := []byte(s.src)
+		defers.Add(func() { _ = os.WriteFile(s.pth, src, 0644) })
+		if err := s.findInsert(); err != nil {
+			return err
+		}
 	}
 	return s.run()
+}
+
+func (s *session) findInsert() error {
+	fs := token.NewFileSet()
+	root, err := parser.ParseFile(fs, filepath.Base(s.pth), s.src,
+		parser.AllErrors)
+	if err != nil {
+		return fmt.Errorf("failed to parse: %d", err)
+	}
+	var found bool
+	ast.Inspect(root, func(n ast.Node) bool {
+		fn, ok := n.(*ast.FuncDecl)
+		if !ok || fn.Name.Name != "main" {
+			return true
+		}
+		found = true
+		s.off = fs.Position(fn.Body.Rbrace).Offset - 1
+		return true
+	})
+	if !found {
+		s.src = append(s.src, []byte("\n\nfunc main() {}\n")...)
+		s.off = len(s.src) - 2
+	}
+	return nil
 }
 
 func (s *session) run() error {
@@ -79,6 +113,7 @@ func (s *session) run() error {
 		}
 		input = strings.TrimSpace(input)
 		if input == ".quit" || input == ".exit" {
+			fmt.Print(s.rem)
 			break
 		}
 		if strings.HasPrefix(input, ":") {
@@ -156,7 +191,7 @@ rerun:
 	if out != "" {
 		fmt.Println(out)
 	}
-	s.off = strings.Count(output, "\n")
+	s.frm += strings.Count(s.newLines(output), "\n")
 	return nil
 }
 
@@ -166,43 +201,42 @@ func (s *session) write(input string) (err error) {
 		return err
 	}
 	defer f.Close()
-	w := func(str string) {
+	w := func(b []byte) {
 		if err != nil {
 			return
 		}
-		_, err = f.WriteString(str)
+		_, err = f.Write(b)
 	}
-	w(string(s.src))
-	w("\nfunc main() {\n")
-	w(s.usr.String())
-	w(input)
-	w("}")
+	w(s.src[:s.off])
+	w([]byte("\n"))
+	w(s.usr.Bytes())
+	w([]byte(input))
+	w([]byte(`println("\000igo:EOF")`))
+	w(s.src[s.off:])
 	return
 }
 
 func (s *session) newLines(output string) string {
-	target := len(output)
+	start := len(output)
 	var count int
 	for i, r := range output {
-		if count >= s.off {
-			target = i
+		if count >= s.frm {
+			start = i
 			break
 		}
 		if r == '\n' {
 			count++
 		}
 	}
-	return stringSlice(output, target, len(output))
-}
-
-func stringSlice(s string, start, end int) string {
-	runes := []rune(s)
-	if start < 0 || start > len(runes) {
-		return ""
-	} else if end < 0 || end > len(runes) {
-		return ""
-	} else if start > end {
-		return ""
+	const eof = "\000igo:EOF\n"
+	end := strings.Index(output, eof)
+	if end < start {
+		end = len(output)
 	}
-	return string(runes[start:end])
+	if n := end + len(eof); n < len([]rune(output)) {
+		s.rem = strings.TrimSuffix(string([]rune(output)[n:]), "\n") + "\n"
+	} else {
+		s.rem = ""
+	}
+	return string([]rune(output)[start:end])
 }
