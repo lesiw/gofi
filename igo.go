@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"go/ast"
+	"go/format"
 	"go/parser"
 	"go/token"
 	"os"
@@ -70,19 +71,28 @@ func run() error {
 		}
 		src := []byte(s.src)
 		defers.Add(func() { _ = os.WriteFile(s.pth, src, 0644) })
-		if err := s.findInsert(); err != nil {
+		if err := s.prepareSrc(); err != nil {
 			return err
 		}
 	}
 	return s.run()
 }
 
-func (s *session) findInsert() error {
+func (s *session) prepareSrc() error {
 	fs := token.NewFileSet()
 	root, err := parser.ParseFile(fs, filepath.Base(s.pth), s.src,
 		parser.AllErrors)
 	if err != nil {
 		return fmt.Errorf("failed to parse: %d", err)
+	}
+	if root.Name.Name != "main" {
+		// Set to package main.
+		root.Name.Name = "main"
+		var buf bytes.Buffer
+		if err := format.Node(&buf, fs, root); err != nil {
+			return fmt.Errorf("failed to modify source: %w", err)
+		}
+		s.src = buf.Bytes()
 	}
 	var found bool
 	ast.Inspect(root, func(n ast.Node) bool {
